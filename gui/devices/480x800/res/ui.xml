@@ -9,9 +9,10 @@
 		<preview>preview.jpg</preview>
 	</details>
 
-	<include>
-		<xmlfile name="portrait.xml" />
-	</include>
+        <include>
+                <xmlfile name="portrait.xml" />
+                <xmlfile name="multirom.xml" />
+        </include>
 
 	<resources>
 		<resource name="font" type="font" filename="RobotoCondensed-Regular.ttf" size="20" fallback="Roboto-Regular-20" />
