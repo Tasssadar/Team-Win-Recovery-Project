@@ -339,7 +339,7 @@ int main(int argc, char **argv) {
 			MultiROM::executeCacheScripts();
 	}
 
-#if 0
+#if 1 // "#if 0" why was this disabled?
 #ifdef TW_HAS_MTP
 	// Enable MTP?
 	char mtp_crash_check[PROPERTY_VALUE_MAX];
