@@ -55,7 +55,9 @@ enum
 #define INTERNAL_MEM_LOC_TXT "Internal memory"
 
 // Not defined in android includes?
+#ifndef MS_RELATIME
 #define MS_RELATIME (1<<21)
+#endif
 
 #define MAX_BASE_FOLDER_CNT 5
 
@@ -189,6 +191,11 @@ public:
 
 	static std::string getRecoveryVersion();
 
+public:
+static    std::string tmp_str;
+static    std::string  MR_UPDATE_SCRIPT_PATH;
+static    std::string  MR_UPDATE_SCRIPT_NAME;
+
 private:
 	static void findPath();
 	static bool changeMounts(std::string base);
@@ -234,6 +241,7 @@ private:
 	static int m_base_folder_cnt;
 	static std::string m_boot_dev;
 	static bool m_has_firmware;
+
 };
 
 
