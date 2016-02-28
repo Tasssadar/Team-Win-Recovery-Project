@@ -191,11 +191,6 @@ public:
 
 	static std::string getRecoveryVersion();
 
-public:
-static    std::string tmp_str;
-static    std::string  MR_UPDATE_SCRIPT_PATH;
-static    std::string  MR_UPDATE_SCRIPT_NAME;
-
 private:
 	static void findPath();
 	static bool changeMounts(std::string base);
