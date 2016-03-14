@@ -38,6 +38,8 @@ extern "C" {
 #include "../libblkid/include/blkid.h"
 #include "cp_xattrs/libcp_xattrs.h"
 
+#include <string>
+
 std::string MultiROM::m_path = "";
 std::string MultiROM::m_boot_dev = "";
 std::string MultiROM::m_mount_rom_paths[2] = { "", "" };
@@ -46,6 +48,8 @@ MROMInstaller *MultiROM::m_installer = NULL;
 MultiROM::baseFolders MultiROM::m_base_folders;
 int MultiROM::m_base_folder_cnt = 0;
 bool MultiROM::m_has_firmware = false;
+#define MR_UPDATE_SCRIPT_PATH   "META-INF/com/google/android/"
+#define MR_UPDATE_SCRIPT_NAME   "META-INF/com/google/android/updater-script"
 
 base_folder::base_folder(const std::string& name, int min_size, int size)
 {
@@ -177,8 +181,8 @@ bool MultiROM::setRomsPath(std::string loc)
 		return false;
 	}
 
-	m_curr_roms_path = "/mnt/multirom-"TARGET_DEVICE"/";
-	mkdir("/mnt/multirom-"TARGET_DEVICE"/", 0777);
+    	m_curr_roms_path = "/mnt/multirom-"  TARGET_DEVICE  "/";
+    	mkdir(m_curr_roms_path.c_str(), 0777);
 	return true;
 }
 
@@ -901,8 +905,6 @@ bool MultiROM::createFakeSystemImg()
 	return true;
 }
 
-#define MR_UPDATE_SCRIPT_PATH  "META-INF/com/google/android/"
-#define MR_UPDATE_SCRIPT_NAME  "META-INF/com/google/android/updater-script"
 
 bool MultiROM::flashZip(std::string rom, std::string file)
 {
@@ -951,15 +953,15 @@ bool MultiROM::flashZip(std::string rom, std::string file)
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, 0);
 	status = TWinstall_zip(file.c_str(), &wipe_cache);
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, verify_status);
-
-	if(restore_script && hacker.restoreState() && hacker.writeToFile("/tmp/"MR_UPDATE_SCRIPT_NAME))
+    	if(restore_script && hacker.restoreState() && hacker.writeToFile("tmp" MR_UPDATE_SCRIPT_NAME))
 	{
 		gui_print("Restoring original updater-script\n");
-		if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
+        if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
 			LOGERR("Failed to restore original updater-script, THIS ZIP IS NOW UNUSEABLE FOR NON-MULTIROM FLASHING\n");
 	}
 
-	system("rm -r "MR_UPDATE_SCRIPT_PATH);
+
+    system("rm -rf" MR_UPDATE_SCRIPT_PATH);
 	if(file == "/tmp/mr_update.zip")
 		system("rm /tmp/mr_update.zip");
 
@@ -1010,15 +1012,14 @@ bool MultiROM::flashORSZip(std::string file, int *wipe_cache)
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, 0);
 	status = TWinstall_zip(file.c_str(), wipe_cache);
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, verify_status);
-
-	if(restore_script && hacker.restoreState() && hacker.writeToFile("/tmp/"MR_UPDATE_SCRIPT_NAME))
+    	if(restore_script && hacker.restoreState() && hacker.writeToFile("tmp" MR_UPDATE_SCRIPT_NAME))
 	{
 		gui_print("Restoring original updater-script\n");
-		if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
+        if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME)  != 0)
 			LOGERR("Failed to restore original updater-script, THIS ZIP IS NOW UNUSEABLE FOR NON-MULTIROM FLASHING\n");
 	}
 
-	system("rm -r "MR_UPDATE_SCRIPT_PATH);
+    system("rm -rf" MR_UPDATE_SCRIPT_PATH);
 	if(file == "/tmp/mr_update.zip")
 		system("rm /tmp/mr_update.zip");
 
@@ -1077,7 +1078,7 @@ bool MultiROM::prepareZIP(std::string& file, EdifyHacker *hacker, bool& restore_
 		return false;
 	}
 
-	system_args("mkdir -p /tmp/%s", MR_UPDATE_SCRIPT_PATH);
+    system_args("mkdir -p /tmp/%s", MR_UPDATE_SCRIPT_PATH);
 
 	MemMapping map;
 	if (sysMapFile(file.c_str(), &map) != 0) {
@@ -1092,10 +1093,10 @@ bool MultiROM::prepareZIP(std::string& file, EdifyHacker *hacker, bool& restore_
 		goto exit;
 	}
 
-	script_entry = mzFindZipEntry(&zip, MR_UPDATE_SCRIPT_NAME);
+    script_entry = mzFindZipEntry(&zip, MR_UPDATE_SCRIPT_NAME);
 	if(!script_entry)
 	{
-		gui_print("Failed to find entry "MR_UPDATE_SCRIPT_NAME" in ZIP file %s!\n", file.c_str());
+        gui_print("Failed to find entry %s in ZIP file %s!\n", MR_UPDATE_SCRIPT_NAME ,file.c_str());
 		goto exit;
 	}
 
@@ -1119,8 +1120,7 @@ bool MultiROM::prepareZIP(std::string& file, EdifyHacker *hacker, bool& restore_
 
 	hacker->saveState();
 	hacker->replaceOffendings();
-
-	if(!hacker->writeToFile("/tmp/"MR_UPDATE_SCRIPT_NAME))
+    	if(!hacker->writeToFile("tmp" MR_UPDATE_SCRIPT_NAME))
 		goto exit;
 
 	hacker->writeToFile("/tmp/mrom_last_updater_script");
@@ -1164,7 +1164,7 @@ bool MultiROM::prepareZIP(std::string& file, EdifyHacker *hacker, bool& restore_
 			restore_script = true;
 		}
 
-		if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
+        	if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME ) != 0)
 		{
 			system("rm /tmp/mr_update.zip");
 			return false;
@@ -2673,7 +2673,7 @@ void MultiROM::executeCacheScripts()
 			if(stat((path + SCRIPT_FILE_CACHE).c_str(), &info) < 0)
 				continue;
 
-			if(info.st_mtime > script.mtime)
+            	if(info.st_mtime > (signed int)script.mtime)
 			{
 				script.mtime = info.st_mtime;
 				script.name = dt->d_name;
@@ -2685,7 +2685,7 @@ void MultiROM::executeCacheScripts()
 			if(stat((path + UBUNTU_COMMAND_FILE).c_str(), &info) < 0)
 				continue;
 
-			if(info.st_mtime > script.mtime)
+            	if(info.st_mtime > (signed int)script.mtime)
 			{
 				script.mtime = info.st_mtime;
 				script.name = dt->d_name;
