@@ -755,6 +755,16 @@ void MultiROM::restoreMounts()
 	system("mv /etc/recovery.fstab.bak /etc/recovery.fstab");
 	system("if [ -e /sbin/mount_real ]; then mv /sbin/mount_real /sbin/mount; fi;");
 
+	// various versions of 'systemless root' and/or installer scripts keep the unmount, but keep the loop device, so get rid of it first
+	system("sync;"
+		"i=0;"
+		"while [ $i -le 10 ]; do"
+		"    if [ -e \"/dev/block/loop$i\" ]; then"
+		"        losetup -d  \"/dev/block/loop$i\";"
+		"    fi;"
+		"    i=$(( $i + 1 ));"
+		"done;");
+
 	// script might have mounted it several times over, we _have_ to umount it all
 	system("sync;"
 		"i=0;"
@@ -2541,6 +2551,14 @@ bool MultiROM::fakeBootPartition(const char *fakeImg)
 
 void MultiROM::restoreBootPartition()
 {
+#ifdef BOARD_BOOTIMAGE_PARTITION_SIZE
+	if(access(m_boot_dev.c_str(), F_OK) == 0)
+	{
+		LOGINFO("Truncating fake boot.img to %d bytes\n", BOARD_BOOTIMAGE_PARTITION_SIZE);
+		truncate(m_boot_dev.c_str(), BOARD_BOOTIMAGE_PARTITION_SIZE);
+	}
+#endif
+
 	if(access((m_boot_dev + "-orig").c_str(), F_OK) < 0)
 	{
 		gui_print("Failed to restore boot partition, %s-orig does not exist!\n", m_boot_dev.c_str());
