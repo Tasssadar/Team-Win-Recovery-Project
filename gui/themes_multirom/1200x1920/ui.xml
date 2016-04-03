@@ -511,24 +511,24 @@
 		<variable name="back_button_x" value="138" />
 		<variable name="slideout_button_x" value="744" />
 
-		<variable name="background" value="#F3F3F3FF" />
+		<variable name="background" value="#1A1A1A" />
 		<variable name="darktransparent" value="#000000bb" />
 		<variable name="lightransparent" value="#00000033" />
 		<variable name="transparent" value="#00000000" />
-		<variable name="text" value="#3B3B3BFF" />
-		<variable name="text_actionbar" value="#E7EBEFFF" />
-		<variable name="text_button" value="#3B3B3BFF" />
-		<variable name="text_light" value="#F3F3F3FF" />
-		<variable name="text_dark" value="#6F6F6FFF" />
-		<variable name="text_highlight" value="#607D8BFF" />
-		<variable name="text_success" value="#68B60B" />
+		<variable name="text" value="#EEEEEE" />
+		<variable name="text_actionbar" value="#EEEEEE" />
+		<variable name="text_button" value="#EEEEEE" />
+		<variable name="text_light" value="#EEEEEE" />
+		<variable name="text_dark" value="#EEEEEE" />
+		<variable name="text_highlight" value="#60EEEEEE" />
+		<variable name="text_success" value="#76FF03" />
 		<variable name="text_fail" value="#FF0101" />
-		<variable name="highlight_color" value="#F3F3F366"  />
-		<variable name="console_foreground" value="#3B3B3BFF" />
-		<variable name="linecolor" value="#D0D0D0FF" />
-		<variable name="warning" value="#F8F8A0FF" />
-		<variable name="error" value="#FF4040FF" />
-		<variable name="highlight" value="#607D8BFF" />
+		<variable name="highlight_color" value="#1A1A1A80"  />
+		<variable name="console_foreground" value="#444444" />
+		<variable name="linecolor" value="#555555" />
+		<variable name="warning" value="#F8F8A0" />
+		<variable name="error" value="#FF0101" />
+		<variable name="highlight" value="#0090CA" />
 
 		<variable name="tab4_col1_x" value="0" />
 		<variable name="tab4_col2_x" value="300" />
@@ -747,7 +747,7 @@
 				<text>%tw_battery%</text>
 			</object>
 
-			<object type="text" color="#FF0000">
+			<object type="text" color="#EEEEEE">
 				<font resource="status" />
 				<placement x="%battery_x%" y="%status_info_y%" placement="1" />
 				<conditions>
@@ -774,7 +774,7 @@
 				<text>%tw_battery%</text>
 			</object>
 
-			<object type="text" color="#FF0000">
+			<object type="text" color="#EEEEEE">
 				<font resource="status" />
 				<placement x="%battery_x_m%" y="%status_info_y%" placement="1" />
 				<conditions>
@@ -800,7 +800,7 @@
 				<text>%tw_battery%</text>
 			</object>
 
-			<object type="text" color="#FF0000">
+			<object type="text" color="#EEEEEE">
 				<font resource="status" />
 				<placement x="%time_x%" y="%status_info_y%" placement="1" />
 				<conditions>
@@ -907,10 +907,10 @@
 				<condition var1="tw_hide_kb" var2="0"/>
 				<placement x="0" y="%keyboard_terminal_y%" w="%screen_width%" h="96"/>
 				<keymargin x="0" y="0"/>
-				<background color="%background%"/>
-				<key-alphanumeric color="%background%" font="keylabel" textcolor="%text%"/>
-				<key-other color="%background%" font="keylabel-small" textcolor="%text_dark%"/>
-				<longpress font="keylabel-longpress" textcolor="%text_dark%" x="12" y="0"/>
+				<background color="#111111"/>
+				<key-alphanumeric color="#111111" font="keylabel" textcolor="#EEEEEE"/>
+				<key-other color="#111111" font="keylabel-small" textcolor="#5b5b5bff"/>
+				<longpress font="keylabel-longpress" textcolor="#5b5b5bff" x="12" y="0"/>
 				<keylabel key="0:k:29" text="Ctrl"/>
 				<keylabel key="0:c:27" text="Esc"/>
 				<keylabel key="0:c:9" text="Tab"/>
@@ -919,7 +919,7 @@
 				<keylabel key="0:k:103" text="^" resource="kb_arrow_up"/>
 				<keylabel key="0:k:106" text="&gt;" resource="kb_arrow_right"/>
 				<highlight color="%highlight_color%"/>
-				<ctrlhighlight color="%highlight_color%"/>
+				<ctrlhighlight color="#0090CA80"/>
 				<layout1>
 					<keysize height="96" width="154"/>
 					<row1 key01="176:k:29" key02="176:c:27" long02=":c:3" key03="176:c:9" key04="168:k:105" key05="168:k:108" key06="168:k:103" key07="168:k:106"/>
@@ -937,10 +937,10 @@
 				<condition var1="tw_hide_kb" var2="0" />
 				<placement x="0" y="%keyboard_y%" w="1200" h="644" />
 				<keymargin x="8" y="8" />
-				<background color="%background%" />
-				<key-alphanumeric color="%background%" font="keylabel" textcolor="%text%" />
-				<key-other color="%background%" font="keylabel-small" textcolor="%text_dark%" />
-				<longpress font="keylabel-longpress" textcolor="%text_dark%" x="12" y="0" />
+				<background color="#111111" />
+				<key-alphanumeric color="#111111" font="keylabel" textcolor="#EEEEEE" />
+				<key-other color="#111111" font="keylabel-small" textcolor="#5b5b5bff" />
+				<longpress font="keylabel-longpress" textcolor="#5b5b5bff" x="12" y="0" />
 				<keylabel key="0:c:8" text="Bksp" resource="backspace" />
 				<keylabel key="0:action" text="Enter" resource="enter" />
 				<keylabel key=" " text="Space" resource="space" />

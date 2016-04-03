@@ -17,8 +17,8 @@
 	<variables>
 		<variable name="screen_width" value="1200"/>
 		<variable name="screen_height" value="1920"/>
-		<variable name="background_color" value="#EEEEEE"/>
-		<variable name="text_color" value="#3B3B3B"/>
+		<variable name="background_color" value="#222222"/>
+		<variable name="text_color" value="#555555"/>
 	</variables>
 
 	<pages>
