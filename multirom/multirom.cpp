@@ -18,6 +18,7 @@
 
 #include "multirom.h"
 #include "../partitions.hpp"
+#include "../progresstracking.hpp"
 #include "../twrp-functions.hpp"
 #include "../twinstall.h"
 #include "../minzip/SysUtil.h"
@@ -27,6 +28,7 @@
 #include "../variables.h"
 #include "../openrecoveryscript.hpp"
 #include "../fuse_sideload.h"
+#include "../gui/blanktimer.hpp"
 #include "multiromedify.h"
 
 extern "C" {
@@ -44,6 +46,7 @@ std::string MultiROM::m_mount_rom_paths[2] = { "", "" };
 std::string MultiROM::m_curr_roms_path = "";
 MROMInstaller *MultiROM::m_installer = NULL;
 MultiROM::baseFolders MultiROM::m_base_folders;
+bool mtp_was_enabled = false;
 int MultiROM::m_base_folder_cnt = 0;
 bool MultiROM::m_has_firmware = false;
 
@@ -73,12 +76,16 @@ MultiROM::config::config()
 	auto_boot_seconds = 5;
 	auto_boot_rom = INTERNAL_NAME;
 	auto_boot_type = 0;
+#ifdef MR_NO_KEXEC
+	no_kexec = MR_NO_KEXEC;
+#endif
 	colors = 0;
 	brightness = 40;
 	hide_internal = 0;
 	int_display_name = INTERNAL_NAME;
 	rotation = TW_DEFAULT_ROTATION;
 	enable_adb = 0;
+	enable_kmsg_logging = 0;
 	force_generic_fb = 0;
 	anim_duration_coef_pct = 100;
 }
@@ -98,6 +105,60 @@ std::string MultiROM::getPath()
 {
 	return m_path;
 }
+
+#ifdef MR_NO_KEXEC
+void MultiROM::nokexec_restore_primary_and_cleanup()
+{
+	if(m_path.empty() && !folderExists())
+		return;
+
+	char path_primary_bootimg[256];
+	struct bootimg img;
+	TWPartition *boot = PartitionManager.Find_Partition_By_Path("/boot");
+
+	sprintf(path_primary_bootimg, "%s/%s", m_path.c_str(), "primary_boot.img");
+
+	// check if previous was secondary
+	if (libbootimg_init_load(&img, boot->Actual_Block_Device.c_str(), LIBBOOTIMG_LOAD_ALL) < 0)
+	{
+		gui_print("MultiROM NO_KEXEC: ERROR: Could not open boot image (%s)!\n", boot->Actual_Block_Device.c_str());
+	}
+	else
+	{
+		// check for secondary tag
+		if (img.hdr.name[BOOT_NAME_SIZE-1] == 0x71)
+		{
+			// primary slot is a secondary boot.img, so restore real primary
+			if (access(path_primary_bootimg, R_OK) == 0)
+			{
+				gui_print("MultiROM NO_KEXEC: restore primary_boot.img\n");
+				//copy_file(path_primary_bootimg, boot->Actual_Block_Device.c_str());
+
+				PartitionSettings part_settings;
+				part_settings.Part = boot; //PartitionManager.Find_Partition_By_Path("/boot");
+				part_settings.Restore_Name = m_path;
+				part_settings.Backup_FileName = "primary_boot.img";
+				part_settings.adbbackup = false;
+				part_settings.adb_compression = false;
+				part_settings.partition_count = 1;
+				part_settings.progress = NULL;
+				part_settings.PM_Method = PM_RESTORE;
+
+				if (boot->Flash_Image(&part_settings))
+					gui_print("... successful.\n");
+				else
+					gui_print("... FAILED.\n");
+			}
+			else
+				gui_print("MultiROM NO_KEXEC: ERROR: couldn’t find real primary to restore\n");
+		}
+		libbootimg_destroy(&img);
+	}
+
+	// cleanup
+	if (access(path_primary_bootimg, R_OK) == 0) remove(path_primary_bootimg);
+}
+#endif //MR_NO_KEXEC
 
 void MultiROM::findPath()
 {
@@ -145,11 +206,87 @@ bool MultiROM::setRomsPath(std::string loc)
 {
 	umount("/mnt"); // umount last thing mounted there
 
+	TWPartition* partition = NULL;
+
+	if(loc.compare(INTERNAL_MEM_LOC_TXT) == 0) {
+		// set partition to internal
+		partition = PartitionManager.Get_Default_Storage_Partition();
+	} else {
+		// find partition from "/dev/block/... (type)" style used by tw_multirom_install_loc
+		std::vector<TWPartition*>& Partitions = PartitionManager.getPartitions();
+		for (std::vector<TWPartition*>::iterator iter = Partitions.begin(); iter != Partitions.end(); iter++) {
+			if (loc == ((*iter)->Actual_Block_Device + " (" + (*iter)->Current_File_System + ")")) {
+				partition = (*iter);
+				break;
+			}
+		}
+	}
+
+	if (partition == NULL) {
+		//no suitable path found
+		m_curr_roms_path.clear();
+		PartitionManager.Update_tw_multirom_variables(partition);
+		return false;
+	}
+
 	if(loc.compare(INTERNAL_MEM_LOC_TXT) == 0)
 	{
 		m_curr_roms_path = m_path + "/roms/";
+		PartitionManager.Update_tw_multirom_variables(loc);
 		return true;
 	}
+	else if (partition->Has_Data_Media)
+	{
+		std::string lnk_path = partition->Storage_Path;
+
+		mkdir("/mnt", 0777); // in case it does not exist
+
+		char cmd[256];
+		sprintf(cmd, "mount %s /mnt", lnk_path.c_str());
+
+		if(system(cmd) != 0)
+		{
+			LOGERR("Failed to mount location \"%s\"!\n", lnk_path.c_str());
+			return false;
+		}
+		m_curr_roms_path = "/mnt/multirom-" TARGET_DEVICE "/";
+		mkdir("/mnt/multirom-" TARGET_DEVICE "/", 0777);
+		PartitionManager.Update_tw_multirom_variables(partition);
+		return true;
+	}
+	// support legacy style for easier merges, otherwise the code could look like this:
+	/*
+	else
+	{
+		std::string dev = partition->Actual_Block_Device;
+		std::string type = partition->Current_File_System;
+
+		mkdir("/mnt", 0777); // in case it does not exist
+
+		char cmd[256];
+		if (type.compare("ntfs") == 0)
+			sprintf(cmd, "ntfs-3g %s /mnt", dev.c_str());
+#ifndef TW_NO_EXFAT_FUSE
+		else if(type.compare("exfat") == 0)
+			sprintf(cmd, "exfat-fuse -o big_writes,max_read=131072,max_write=131072,nonempty %s /mnt", dev.c_str());
+#endif
+		else
+			sprintf(cmd, "mount %s /mnt", dev.c_str());
+
+		if(system(cmd) != 0)
+		{
+			LOGERR("Failed to mount location \"%s\"(%s)!\n", dev.c_str(), type.c_str());
+			return false;
+		}
+		m_curr_roms_path = "/mnt/multirom-"TARGET_DEVICE"/";
+		mkdir("/mnt/multirom-"TARGET_DEVICE"/", 0777);
+		PartitionManager.Update_tw_multirom_variables(partition);
+		return true;
+	}
+	*/
+	
+	// legacy 'loc' style for easier merges
+	loc = partition->Actual_Block_Device + " (" + partition->Current_File_System + ")";
 
 	size_t idx = loc.find(' ');
 	if(idx == std::string::npos)
@@ -177,13 +314,15 @@ bool MultiROM::setRomsPath(std::string loc)
 		return false;
 	}
 
-	m_curr_roms_path = "/mnt/multirom-"TARGET_DEVICE"/";
-	mkdir("/mnt/multirom-"TARGET_DEVICE"/", 0777);
+	m_curr_roms_path = "/mnt/multirom-" TARGET_DEVICE "/";
+	mkdir("/mnt/multirom-" TARGET_DEVICE "/", 0777);
+	PartitionManager.Update_tw_multirom_variables(partition);
 	return true;
 }
 
 std::string MultiROM::listInstallLocations()
 {
+// legacy code, no longer used
 	std::string res = INTERNAL_MEM_LOC_TXT"\n";
 	blkid_probe pr;
 	const char *type;
@@ -562,12 +701,18 @@ MultiROM::config MultiROM::loadConfig()
 				cfg.auto_boot_rom = val;
 			else if(name == "auto_boot_type")
 				cfg.auto_boot_type = atoi(val.c_str());
+#ifdef MR_NO_KEXEC
+			else if(name == "no_kexec")
+				cfg.no_kexec = atoi(val.c_str());
+#endif
 			else if(name == "colors_v2")
 				cfg.colors = atoi(val.c_str());
 			else if(name == "brightness")
 				cfg.brightness = atoi(val.c_str());
 			else if(name == "enable_adb")
 				cfg.enable_adb = atoi(val.c_str());
+			else if(name == "enable_kmsg_logging")
+				cfg.enable_kmsg_logging = atoi(val.c_str());
 			else if(name == "hide_internal")
 				cfg.hide_internal = atoi(val.c_str());
 			else if(name == "int_display_name")
@@ -596,9 +741,13 @@ void MultiROM::saveConfig(const MultiROM::config& cfg)
 	fprintf(f, "auto_boot_seconds=%d\n", cfg.auto_boot_seconds);
 	fprintf(f, "auto_boot_rom=%s\n", cfg.auto_boot_rom.c_str());
 	fprintf(f, "auto_boot_type=%d\n", cfg.auto_boot_type);
+#ifdef MR_NO_KEXEC
+	fprintf(f, "no_kexec=%d\n", cfg.no_kexec);
+#endif
 	fprintf(f, "colors_v2=%d\n", cfg.colors);
 	fprintf(f, "brightness=%d\n", cfg.brightness);
 	fprintf(f, "enable_adb=%d\n", cfg.enable_adb);
+	fprintf(f, "enable_kmsg_logging=%d\n", cfg.enable_kmsg_logging);
 	fprintf(f, "hide_internal=%d\n", cfg.hide_internal);
 	fprintf(f, "int_display_name=%s\n", cfg.int_display_name.c_str());
 	fprintf(f, "rotation=%d\n", cfg.rotation);
@@ -612,6 +761,8 @@ void MultiROM::saveConfig(const MultiROM::config& cfg)
 bool MultiROM::changeMounts(std::string name)
 {
 	gui_print("Changing mounts to ROM %s...\n", name.c_str());
+
+	mtp_was_enabled = TWFunc::Toggle_MTP(false);
 
 	int type = getType(name);
 	std::string base = getRomsPath() + name;
@@ -649,6 +800,7 @@ bool MultiROM::changeMounts(std::string name)
 		m_path.clear();
 		PartitionManager.Pop_Context();
 		PartitionManager.Update_System_Details();
+		TWFunc::Toggle_MTP(mtp_was_enabled);
 		return false;
 	}
 
@@ -673,6 +825,7 @@ bool MultiROM::changeMounts(std::string name)
 		gui_print("Failed to mount realdata, canceling!\n");
 		PartitionManager.Pop_Context();
 		PartitionManager.Update_System_Details();
+		TWFunc::Toggle_MTP(mtp_was_enabled);
 		return false;
 	}
 
@@ -720,6 +873,7 @@ bool MultiROM::changeMounts(std::string name)
 		realdata->UnMount(false);
 		PartitionManager.Pop_Context();
 		PartitionManager.Update_System_Details();
+		TWFunc::Toggle_MTP(mtp_was_enabled);
 		return false;
 	}
 
@@ -755,6 +909,16 @@ void MultiROM::restoreMounts()
 	system("mv /etc/recovery.fstab.bak /etc/recovery.fstab");
 	system("if [ -e /sbin/mount_real ]; then mv /sbin/mount_real /sbin/mount; fi;");
 
+	// various versions of 'systemless root' and/or installer scripts keep the unmount, but keep the loop device, so get rid of it first
+	system("sync;"
+		"i=0;"
+		"while [ $i -le 10 ]; do"
+		"    if [ -e \"/dev/block/loop$i\" ]; then"
+		"        losetup -d  \"/dev/block/loop$i\";"
+		"    fi;"
+		"    i=$(( $i + 1 ));"
+		"done;");
+
 	// script might have mounted it several times over, we _have_ to umount it all
 	system("sync;"
 		"i=0;"
@@ -789,6 +953,8 @@ void MultiROM::restoreMounts()
 	// The storage path gets set to wrong fake data when restored above, call it again
 	// with the the path to call Data::SetBackupFolder() again.
 	DataManager::SetValue("tw_storage_path", DataManager::GetStrValue("tw_storage_path"));
+
+	TWFunc::Toggle_MTP(mtp_was_enabled);
 
 	restoreROMPath();
 }
@@ -925,6 +1091,9 @@ bool MultiROM::flashZip(std::string rom, std::string file)
 	if(!prepareZIP(file, &hacker, restore_script))  // may change file var
 		return false;
 
+	// unblank here so we can see some progress (kinda optional)
+	blankTimer.resetTimerAndUnblank();
+
 	if(!changeMounts(rom))
 	{
 		gui_print("Failed to change mountpoints!\n");
@@ -948,18 +1117,33 @@ bool MultiROM::flashZip(std::string rom, std::string file)
 			goto exit;
 	}
 
+	// unblank here is necessary; if we don't bring the screen back up and the zip has an AROMA
+	// Installer, it will take over the screen and buttons and we won't be able to manually wake the screen
+	blankTimer.resetTimerAndUnblank();
+
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, 0);
 	status = TWinstall_zip(file.c_str(), &wipe_cache);
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, verify_status);
 
-	if(restore_script && hacker.restoreState() && hacker.writeToFile("/tmp/"MR_UPDATE_SCRIPT_NAME))
+	if((hacker.getProcessFlags() & EDIFY_BLOCK_UPDATES) && system_args("busybox umount -d /tmpsystem") != 0)
+		system_args("dev=\"$(losetup | grep 'system\\.img' | grep -o '/.*:')\"; losetup -d \"${dev%%:}\"");
+
+exit:
+	// not really needed blankTimer.resetTimerAndUnblank();
+
+	if(hacker.getProcessFlags() & EDIFY_BLOCK_UPDATES)
+		failsafeCheckPartition("/tmp/mrom_fakesyspart");
+
+	if(restore_script && hacker.restoreState() && hacker.writeToFile("/tmp/" MR_UPDATE_SCRIPT_NAME))
 	{
 		gui_print("Restoring original updater-script\n");
 		if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
 			LOGERR("Failed to restore original updater-script, THIS ZIP IS NOW UNUSEABLE FOR NON-MULTIROM FLASHING\n");
 	}
 
-	system("rm -r "MR_UPDATE_SCRIPT_PATH);
+	// not really needed blankTimer.resetTimerAndUnblank();
+
+	system("rm -r " MR_UPDATE_SCRIPT_PATH);
 	if(file == "/tmp/mr_update.zip")
 		system("rm /tmp/mr_update.zip");
 
@@ -967,13 +1151,6 @@ bool MultiROM::flashZip(std::string rom, std::string file)
 		gui_print("Failed to install ZIP!\n");
 	else
 		gui_print("ZIP successfully installed\n");
-
-	if((hacker.getProcessFlags() & EDIFY_BLOCK_UPDATES) && system_args("busybox umount -d /tmpsystem") != 0)
-		system_args("dev=\"$(losetup | grep 'system\\.img' | grep -o '/.*:')\"; losetup -d \"${dev%%:}\"");
-
-exit:
-	if(hacker.getProcessFlags() & EDIFY_BLOCK_UPDATES)
-		failsafeCheckPartition("/tmp/mrom_fakesyspart");
 
 	restoreBootPartition();
 	restoreMounts();
@@ -1007,25 +1184,11 @@ bool MultiROM::flashORSZip(std::string file, int *wipe_cache)
 			return false;
 	}
 
+	blankTimer.resetTimerAndUnblank(); // same as above (about AROMA Installer)
+
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, 0);
 	status = TWinstall_zip(file.c_str(), wipe_cache);
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, verify_status);
-
-	if(restore_script && hacker.restoreState() && hacker.writeToFile("/tmp/"MR_UPDATE_SCRIPT_NAME))
-	{
-		gui_print("Restoring original updater-script\n");
-		if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
-			LOGERR("Failed to restore original updater-script, THIS ZIP IS NOW UNUSEABLE FOR NON-MULTIROM FLASHING\n");
-	}
-
-	system("rm -r "MR_UPDATE_SCRIPT_PATH);
-	if(file == "/tmp/mr_update.zip")
-		system("rm /tmp/mr_update.zip");
-
-	if(status != INSTALL_SUCCESS)
-		gui_print("Failed to install ZIP!\n");
-	else
-		gui_print("ZIP successfully installed\n");
 
 	if(hacker.getProcessFlags() & EDIFY_BLOCK_UPDATES)
 	{
@@ -1033,6 +1196,22 @@ bool MultiROM::flashORSZip(std::string file, int *wipe_cache)
 			system_args("dev=\"$(losetup | grep 'system\\.img' | grep -o '/.*:')\"; losetup -d \"${dev%%:}\"");
 		failsafeCheckPartition("/tmp/mrom_fakesyspart");
 	}
+
+	if(restore_script && hacker.restoreState() && hacker.writeToFile("/tmp/" MR_UPDATE_SCRIPT_NAME))
+	{
+		gui_print("Restoring original updater-script\n");
+		if(system_args("cd /tmp && zip \"%s\" %s", file.c_str(), MR_UPDATE_SCRIPT_NAME) != 0)
+			LOGERR("Failed to restore original updater-script, THIS ZIP IS NOW UNUSEABLE FOR NON-MULTIROM FLASHING\n");
+	}
+
+	system("rm -r " MR_UPDATE_SCRIPT_PATH);
+	if(file == "/tmp/mr_update.zip")
+		system("rm /tmp/mr_update.zip");
+
+	if(status != INSTALL_SUCCESS)
+		gui_print("Failed to install ZIP!\n");
+	else
+		gui_print("ZIP successfully installed\n");
 
 	return (status == INSTALL_SUCCESS);
 }
@@ -1095,7 +1274,7 @@ bool MultiROM::prepareZIP(std::string& file, EdifyHacker *hacker, bool& restore_
 	script_entry = mzFindZipEntry(&zip, MR_UPDATE_SCRIPT_NAME);
 	if(!script_entry)
 	{
-		gui_print("Failed to find entry "MR_UPDATE_SCRIPT_NAME" in ZIP file %s!\n", file.c_str());
+		gui_print("Failed to find entry " MR_UPDATE_SCRIPT_NAME " in ZIP file %s!\n", file.c_str());
 		goto exit;
 	}
 
@@ -1120,7 +1299,7 @@ bool MultiROM::prepareZIP(std::string& file, EdifyHacker *hacker, bool& restore_
 	hacker->saveState();
 	hacker->replaceOffendings();
 
-	if(!hacker->writeToFile("/tmp/"MR_UPDATE_SCRIPT_NAME))
+	if(!hacker->writeToFile("/tmp/" MR_UPDATE_SCRIPT_NAME))
 		goto exit;
 
 	hacker->writeToFile("/tmp/mrom_last_updater_script");
@@ -1622,8 +1801,9 @@ bool MultiROM::extractBootForROM(std::string base)
 	system("rm -r /tmp/boot");
 	system("mkdir /tmp/boot");
 
+	struct stat stat_buffer;
 	int rd_cmpr = decompressRamdisk((base + "/boot/initrd.img").c_str(), "/tmp/boot");
-	if(rd_cmpr == -1 || access("/tmp/boot/init", F_OK) < 0)
+	if(rd_cmpr == -1 || lstat("/tmp/boot/init", &stat_buffer) < 0)
 	{
 		gui_print("Failed to extract ramdisk!\n");
 		return false;
@@ -2125,21 +2305,19 @@ bool MultiROM::installFromBackup(std::string name, std::string path, int type)
 	if(path.find("/data/media") == 0)
 		path.replace(0, 5, REALDATA);
 
-	unsigned long long total_restore_size = 0, already_restored_size = 0;
-	const int partCnt = has_data ? 2 : 1;
 	bool res = false;
-	TWPartition *sys_part = PartitionManager.Find_Partition_By_Path("/system");
-	TWPartition *data_part = PartitionManager.Find_Partition_By_Path("/data");
-	if(sys_part && data_part)
-	{
-		PartitionManager.Set_Restore_Files(path);
-		res = PartitionManager.Restore_Partition(sys_part, path, partCnt, &total_restore_size, &already_restored_size) &&
-				(!has_data || PartitionManager.Restore_Partition(data_part, path, partCnt, &total_restore_size, &already_restored_size));
-	}
+
+	PartitionManager.Set_Restore_Files(path); // Restore_Name is the same as path
+
+	DataManager::SetValue(TW_SKIP_MD5_CHECK_VAR, 0);
+
+	// tw_restore_selected (aka Restore_List) used by Run_Restore has the format = '/boot;/cache;/system;/data;/recovery;'
+	if (!has_data)
+		DataManager::SetValue("tw_restore_selected", "/system;");
 	else
-	{
-		gui_print("Failed to find /system and /data partition!");
-	}
+		DataManager::SetValue("tw_restore_selected", "/system;/data;");
+
+	res = PartitionManager.Run_Restore(path);
 
 	restoreMounts();
 	return res;
@@ -2541,6 +2719,14 @@ bool MultiROM::fakeBootPartition(const char *fakeImg)
 
 void MultiROM::restoreBootPartition()
 {
+#ifdef BOARD_BOOTIMAGE_PARTITION_SIZE
+	if(access(m_boot_dev.c_str(), F_OK) == 0)
+	{
+		LOGINFO("Truncating fake boot.img to %d bytes\n", BOARD_BOOTIMAGE_PARTITION_SIZE);
+		truncate(m_boot_dev.c_str(), BOARD_BOOTIMAGE_PARTITION_SIZE);
+	}
+#endif
+
 	if(access((m_boot_dev + "-orig").c_str(), F_OK) < 0)
 	{
 		gui_print("Failed to restore boot partition, %s-orig does not exist!\n", m_boot_dev.c_str());
@@ -2653,7 +2839,7 @@ void MultiROM::executeCacheScripts()
 	struct dirent *dt;
 	struct stat info;
 	struct script_t  {
-		unsigned long mtime;
+		time_t mtime; // unsigned long mtime;
 		std::string name;
 		int type;
 	} script;

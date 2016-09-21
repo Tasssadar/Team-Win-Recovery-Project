@@ -79,12 +79,68 @@ std::string EdifyFunc::getArgsStr() const
     return res;
 }
 
+bool is_word(const std::string& text_string, const char * word, const char * additional_pre_allowed = "", const char * additional_post_allowed = "")
+{
+    size_t pos = text_string.find(word);
+    bool pre_check  = true;
+    bool post_check = true;
+
+    if (strcmp(additional_pre_allowed, "dont_check") !=0)
+    {
+        char pre_word_char  = text_string[pos - 1];
+        pre_check  = isspace(pre_word_char)  || ( strchr(additional_pre_allowed, pre_word_char) != NULL );
+    }
+
+    if (strcmp(additional_post_allowed, "dont_check") !=0)
+    {
+        char post_word_char = text_string[pos + strlen(word) + 1];
+        post_check = isspace(post_word_char) || ( strchr(additional_post_allowed, post_word_char) != NULL );
+    }
+
+    return pre_check && post_check;
+}
+
 int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::list<EdifyElement*>::iterator& lastNewlineRef)
 {
     int res = 0;
 
     if(m_name == "mount" || m_name == "unmount" || m_name == "format")
     {
+        // we only care about certain partitions, disregard the rest (eg systemless root 'su')
+        int found = 0;
+        static const char *offending_mounts[] = {
+            "/cache",
+            "/system",
+            "/data",
+            "/userdata",
+            NULL
+        };
+
+        for(std::list<EdifyElement*>::iterator itr = m_args.begin(); itr != m_args.end(); ++itr)
+        {
+            if((*itr)->getType() != EDF_VALUE)
+                continue;
+
+            for(int i = 0; offending_mounts[i]; ++i)
+            {
+                const std::string& t = ((EdifyValue*)(*itr))->getText();
+                if(t.find(offending_mounts[i]) != NPOS)
+                {
+                    // we found one, but make sure it's not embedded such as "/data/su.img"
+                    if ( is_word(t, offending_mounts[i], "dont_check", "\"") )
+                    {
+                        found = 1;
+                        break;
+                    }
+                }
+            }
+            if (found) break;
+        }
+
+        if (!found)
+            return res; // we didn't find an offending partition, so abort change
+
+
         lastNewlineRef = (*parentList)->insert(++lastNewlineRef, new EdifyValue(
                 std::string("# MultiROM removed function ") + m_name +
                 "(" + getArgsStr() +
@@ -109,7 +165,7 @@ int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::lis
         res |= OFF_CHANGED;
         m_name = "ui_print";
         clearArgs();
-        addArg(new EdifyValue("\"\""));
+        addArg(new EdifyValue("\" \""));
         return res;
     }
     else if(m_name == "block_image_update")
@@ -128,8 +184,12 @@ int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::lis
             const std::string& t = ((EdifyValue*)(*itr))->getText();
             if(t.find("mount") != std::string::npos)
             {
-                rem = true;
-                break;
+                // check it's the actual mount command, and not part of something longer such as: run_program("/tmp/mount_su_image.sh");
+                if ( is_word(t, "mount", "\"`/;", "\"`/;") )
+                {
+                    rem = true;
+                    break;
+                }
             }
             else if(t.find("boot.img") != NPOS || t.find(MultiROM::getBootDev()) != NPOS ||
                 t.find("zImage") != NPOS || t.find("bootimg") != NPOS)
@@ -179,10 +239,23 @@ int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::lis
                         break;
                     }
                 }
+
+                // package_extract_file("system.img", "/dev/block/platform/msm_sdcc.1/by-name/system");
+                if(st == 0 && (((EdifyValue*)(*itr))->getText().find("system.img") != NPOS))
+                {
+                    st = 3;
+                }
             }
             else if(st == 1 && (((EdifyValue*)(*itr))->getText().find("/dev/block/") <= 1))
             {
                 st = 2;
+                break;
+            }
+
+            // package_extract_file("system.img", "/dev/block/platform/msm_sdcc.1/by-name/system");
+            else if(st == 3 && (((EdifyValue*)(*itr))->getText().find("/dev/block/") <= 1))
+            {
+                st = 4;
                 break;
             }
         }
@@ -197,7 +270,11 @@ int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::lis
             res |= OFF_CHANGED;
             m_name = "ui_print";
             clearArgs();
-            addArg(new EdifyValue("\"\""));
+            addArg(new EdifyValue("\" \""));
+        }
+        else if(st == 4)
+        {
+            res |= OFF_BLOCK_UPDATES;
         }
     }
     else if(m_name == "range_sha1")
@@ -442,7 +519,7 @@ void EdifyHacker::replaceOffendings()
         if(t.compare(HACKER_IDENT_LINE) == 0)
         {
             LOGINFO("EdifyHacker: this updater-script has been already processed, doing nothing.\n");
-            m_processFlags = 0;
+            m_processFlags = 0; // FIXME: potential problem: if the script needs EDIFY_BLOCK_UPDATES tmpsystem.img it wont be created, in this case
             return;
         }
     }

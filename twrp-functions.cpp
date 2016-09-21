@@ -38,6 +38,7 @@
 #include <algorithm>
 #include "twrp-functions.hpp"
 #include "twcommon.h"
+#include "gui/gui.hpp"
 #ifndef BUILD_TWRPTAR_MAIN
 #include "data.hpp"
 #include "partitions.hpp"
@@ -45,7 +46,6 @@
 #include "bootloader.h"
 #include "cutils/properties.h"
 #include "cutils/android_reboot.h"
-#include "gui/gui.hpp"
 #include <sys/reboot.h>
 #endif // ndef BUILD_TWRPTAR_MAIN
 #ifndef TW_EXCLUDE_ENCRYPTED_BACKUPS
@@ -128,7 +128,7 @@ int TWFunc::Exec_Cmd_Show_Output(const string& cmd) {
 		memset(buffer, 0, sizeof(buffer));
 		if (fgets(buffer, 128, exec) != NULL) {
 			buffer[128] = '\n';
-			buffer[129] = NULL;
+			buffer[129] = '\x0';
 			gui_print(buffer);
 		}
 	}
@@ -193,7 +193,7 @@ bool TWFunc::Path_Exists(string Path) {
 		return true;
 }
 
-int TWFunc::Get_File_Type(string fn) {
+Archive_Type TWFunc::Get_File_Type(string fn) {
 	string::size_type i = 0;
 	int firstbyte = 0, secondbyte = 0;
 	char header[3];
@@ -206,13 +206,10 @@ int TWFunc::Get_File_Type(string fn) {
 	secondbyte = header[++i] & 0xff;
 
 	if (firstbyte == 0x1f && secondbyte == 0x8b)
-		return 1; // Compressed
+		return COMPRESSED;
 	else if (firstbyte == 0x4f && secondbyte == 0x41)
-		return 2; // Encrypted
-	else
-		return 0; // Unknown
-
-	return 0;
+		return ENCRYPTED;
+	return UNCOMPRESSED; // default
 }
 
 int TWFunc::Try_Decrypting_File(string fn, string password) {
@@ -314,7 +311,7 @@ int TWFunc::Try_Decrypting_File(string fn, string password) {
 #endif
 }
 
-unsigned long TWFunc::Get_File_Size(string Path) {
+unsigned long TWFunc::Get_File_Size(const string& Path) {
 	struct stat st;
 
 	if (stat(Path.c_str(), &st) != 0)
@@ -347,6 +344,13 @@ std::string TWFunc::Remove_Trailing_Slashes(const std::string& path, bool leaveL
 	return res;
 }
 
+void TWFunc::Strip_Quotes(char* &str) {
+	if (strlen(str) > 0 && str[0] == '\"')
+		str++;
+	if (strlen(str) > 0 && str[strlen(str)-1] == '\"')
+		str[strlen(str)-1] = 0;
+}
+
 vector<string> TWFunc::split_string(const string &in, char del, bool skip_empty) {
 	vector<string> res;
 
@@ -369,6 +373,25 @@ vector<string> TWFunc::split_string(const string &in, char del, bool skip_empty)
 		}
 	}
 	return res;
+}
+
+timespec TWFunc::timespec_diff(timespec& start, timespec& end)
+{
+	timespec temp;
+	if ((end.tv_nsec-start.tv_nsec)<0) {
+		temp.tv_sec = end.tv_sec-start.tv_sec-1;
+		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+	} else {
+		temp.tv_sec = end.tv_sec-start.tv_sec;
+		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+	}
+	return temp;
+}
+
+int32_t TWFunc::timespec_diff_ms(timespec& start, timespec& end)
+{
+	return ((end.tv_sec * 1000) + end.tv_nsec/1000000) -
+			((start.tv_sec * 1000) + start.tv_nsec/1000000);
 }
 
 #ifndef BUILD_TWRPTAR_MAIN
@@ -548,9 +571,10 @@ void TWFunc::Update_Intent_File(string Intent) {
 // reboot: Reboot the system. Return -1 on error, no return on success
 int TWFunc::tw_reboot(RebootCommand command)
 {
+	DataManager::Flush();
+	Update_Log_File();
 	// Always force a sync before we reboot
 	sync();
-	Update_Log_File();
 
 	switch (command) {
 		case rb_current:
@@ -762,25 +786,6 @@ int TWFunc::write_file(string fn, const string& line, const char *mode) {
 }
 #endif //TARGET_RECOVERY_IS_MULTIROM
 
-timespec TWFunc::timespec_diff(timespec& start, timespec& end)
-{
-	timespec temp;
-	if ((end.tv_nsec-start.tv_nsec)<0) {
-		temp.tv_sec = end.tv_sec-start.tv_sec-1;
-		temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
-	} else {
-		temp.tv_sec = end.tv_sec-start.tv_sec;
-		temp.tv_nsec = end.tv_nsec-start.tv_nsec;
-	}
-	return temp;
-}
-
-int32_t TWFunc::timespec_diff_ms(timespec& start, timespec& end)
-{
-	return ((end.tv_sec * 1000) + end.tv_nsec/1000000) -
-			((start.tv_sec * 1000) + start.tv_nsec/1000000);
-}
-
 bool TWFunc::Install_SuperSU(void) {
 	if (!PartitionManager.Mount_By_Path("/system", true))
 		return false;
@@ -804,7 +809,7 @@ bool TWFunc::Try_Decrypting_Backup(string Restore_Path, string Password) {
 	while ((de = readdir(d)) != NULL) {
 		Filename = Restore_Path;
 		Filename += de->d_name;
-		if (TWFunc::Get_File_Type(Filename) == 2) {
+		if (TWFunc::Get_File_Type(Filename) == ENCRYPTED) {
 			if (TWFunc::Try_Decrypting_File(Filename, Password) < 2) {
 				DataManager::SetValue("tw_restore_password", ""); // Clear the bad password
 				DataManager::SetValue("tw_restore_display", "");  // Also clear the display mask

@@ -460,6 +460,14 @@ static void ors_command_read()
 				gui_set_FILE(orsout);
 				PageManager::GetResources()->DumpStrings();
 				ors_command_done();
+			//check to see if we should show backup page for parsing adbbackup partitions
+			} else if (strlen(command) == 23 && strncmp(command, "adbbackup", 9) == 0) {
+				gui_set_FILE(orsout);
+				DataManager::SetValue("tw_action", "twcmd");
+				DataManager::SetValue("tw_action_param", command);
+				DataManager::SetValue("tw_enable_adb_backup", 1);
+				gui_changePage("backup");
+				ors_command_done();
 			} else {
 				// mirror output messages
 				gui_set_FILE(orsout);
@@ -480,8 +488,6 @@ static void ors_command_read()
 				// put all things that need to be done after the command is finished into ors_command_done, not here
 			}
 		}
-	} else {
-		LOGINFO("ORS command line read returned an error: %i, %i, %s\n", read_ret, errno, strerror(errno));
 	}
 }
 
@@ -544,11 +550,9 @@ static int runPages(const char *page_name, const int stop_on_page_done)
 
 	DataManager::SetValue("tw_loaded", 1);
 
-#ifndef TW_OEM_BUILD
 	struct timeval timeout;
 	fd_set fdset;
 	int has_data = 0;
-#endif
 
 	int input_timeout_ms = 0;
 	int idle_frames = 0;
@@ -767,7 +771,7 @@ extern "C" int gui_loadResources(void)
 			check = 1;
 	}
 
-	if (check == 0 && PageManager::LoadPackage("TWRP", "/script/ui.xml", "main"))
+	if (check == 0)
 	{
 		std::string theme_path;
 

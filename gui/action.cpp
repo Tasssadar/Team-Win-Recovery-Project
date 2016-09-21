@@ -63,8 +63,6 @@ extern "C" {
 #include "../multirom/mrominstaller.h"
 #endif //TARGET_RECOVERY_IS_MULTIROM
 
-void curtainClose(void);
-
 GUIAction::mapFunc GUIAction::mf;
 std::set<string> GUIAction::setActionsRunningInCallerThread;
 static string zip_queue[10];
@@ -187,6 +185,7 @@ GUIAction::GUIAction(xml_node<>* node)
 		ADD_ACTION(cancelzip);
 		ADD_ACTION(queueclear);
 		ADD_ACTION(sleep);
+		ADD_ACTION(sleepcounter);
 		ADD_ACTION(appenddatetobackupname);
 		ADD_ACTION(generatebackupname);
 		ADD_ACTION(checkpartitionlist);
@@ -329,7 +328,7 @@ GUIAction::GUIAction(xml_node<>* node)
 	}
 }
 
-int GUIAction::NotifyTouch(TOUCH_STATE state __unused, int x __unused, int y __unused)
+int GUIAction::NotifyTouch(TOUCH_STATE state, int x __unused, int y __unused)
 {
 	if (state == TOUCH_RELEASE)
 		doActions();
@@ -566,8 +565,6 @@ void GUIAction::operation_end(const int operation_status)
 
 int GUIAction::reboot(std::string arg)
 {
-	//curtainClose(); this sometimes causes a crash
-
 	sync();
 	DataManager::SetValue("tw_gui_done", 1);
 	DataManager::SetValue("tw_reboot_arg", arg);
@@ -833,6 +830,23 @@ int GUIAction::sleep(std::string arg)
 	return 0;
 }
 
+int GUIAction::sleepcounter(std::string arg)
+{
+	operation_start("SleepCounter");
+	// Ensure user notices countdown in case it needs to be cancelled
+	blankTimer.resetTimerAndUnblank();
+	int total = atoi(arg.c_str());
+	for (int t = total; t > 0; t--) {
+		int progress = (int)(((float)(total-t)/(float)total)*100.0);
+		DataManager::SetValue("ui_progress", progress);
+		::sleep(1);
+		DataManager::SetValue("tw_sleep", t-1);
+	}
+	DataManager::SetValue("ui_progress", 100);
+	operation_end(0);
+	return 0;
+}
+
 int GUIAction::appenddatetobackupname(std::string arg __unused)
 {
 	operation_start("AppendDateToBackupName");
@@ -842,6 +856,8 @@ int GUIAction::appenddatetobackupname(std::string arg __unused)
 	if (Backup_Name.size() > MAX_BACKUP_NAME_LEN)
 		Backup_Name.resize(MAX_BACKUP_NAME_LEN);
 	DataManager::SetValue(TW_BACKUP_NAME, Backup_Name);
+	PageManager::NotifyKey(KEY_END, true);
+	PageManager::NotifyKey(KEY_END, false);
 	operation_end(0);
 	return 0;
 }
@@ -1084,6 +1100,7 @@ int GUIAction::flash(std::string arg)
 	reinject_after_flash();
 	PartitionManager.Update_System_Details();
 	operation_end(ret_val);
+	// This needs to be after the operation_end call so we change pages before we change variables that we display on the screen
 	DataManager::SetValue(TW_ZIP_QUEUE_COUNT, zip_queue_index);
 	return 0;
 }
@@ -1230,9 +1247,8 @@ int GUIAction::nandroid(std::string arg)
 			DataManager::GetValue(TW_BACKUP_NAME, Backup_Name);
 			string auto_gen = gui_lookup("auto_generate", "(Auto Generate)");
 			if (Backup_Name == auto_gen || Backup_Name == gui_lookup("curr_date", "(Current Date)") || Backup_Name == "0" || Backup_Name == "(" || PartitionManager.Check_Backup_Name(true) == 0) {
-				ret = PartitionManager.Run_Backup();
-			}
-			else {
+				ret = PartitionManager.Run_Backup(false);
+			} else {
 				operation_end(1);
 				return -1;
 			}
@@ -1779,12 +1795,16 @@ int GUIAction::flashimage(std::string arg __unused)
 {
 	int op_status = 0;
 
+	PartitionSettings part_settings;
 	operation_start("Flash Image");
-	string path, filename, full_filename;
-	DataManager::GetValue("tw_zip_location", path);
-	DataManager::GetValue("tw_file", filename);
-	full_filename = path + "/" + filename;
-	if (PartitionManager.Flash_Image(full_filename))
+	DataManager::GetValue("tw_zip_location", part_settings.Restore_Name);
+	DataManager::GetValue("tw_file", part_settings.Backup_FileName);
+	unsigned long long total_bytes = TWFunc::Get_File_Size(part_settings.Restore_Name + "/" + part_settings.Backup_FileName);
+	ProgressTracking progress(total_bytes);
+	part_settings.progress = &progress;
+	part_settings.adbbackup = false;
+	part_settings.PM_Method = PM_RESTORE;
+	if (PartitionManager.Flash_Image(&part_settings))
 		op_status = 0; // success
 	else
 		op_status = 1; // fail
@@ -1856,7 +1876,7 @@ int GUIAction::rotation(std::string arg)
 ////	return !gui_rotate(rot);
 }
 
-int GUIAction::timeout(std::string arg)
+int GUIAction::timeout(std::string arg __unused)
 {
 //TODO
 #ifndef TW_NO_SCREEN_TIMEOUT
@@ -1865,7 +1885,7 @@ int GUIAction::timeout(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom(std::string arg)
+int GUIAction::multirom(std::string arg __unused)
 {
 	if(MultiROM::folderExists())
 		return gui_changePage("multirom_main");
@@ -1874,12 +1894,12 @@ int GUIAction::multirom(std::string arg)
 		DataManager::SetValue("tw_mrom_title", "MultiROM is not installed!");
 		DataManager::SetValue("tw_mrom_text1", "/data/media/multirom not found.");
 		DataManager::SetValue("tw_mrom_text2", "/data/media/0/multirom not found.");
-		DataManager::SetValue("tw_mrom_back", "advanced");
+		DataManager::SetValue("tw_mrom_back", "main");
 		return gui_changePage("multirom_msg");
 	}
 }
 
-int GUIAction::multirom_reset_roms_paths(std::string arg)
+int GUIAction::multirom_reset_roms_paths(std::string arg __unused)
 {
 	MultiROM::setRomsPath(INTERNAL_MEM_LOC_TXT);
 	DataManager::SetValue("tw_multirom_folder", MultiROM::getRomsPath());
@@ -1895,7 +1915,7 @@ int GUIAction::multirom_rename(std::string arg)
 	return gui_changePage("multirom_list");
 }
 
-int GUIAction::multirom_manage(std::string arg)
+int GUIAction::multirom_manage(std::string arg __unused)
 {
 	std::string name = DataManager::GetStrValue("tw_multirom_rom_name");
 	int type = MultiROM::getType(name);
@@ -1917,7 +1937,7 @@ int GUIAction::multirom_manage(std::string arg)
 	return gui_changePage("multirom_manage");
 }
 
-int GUIAction::multirom_settings(std::string arg)
+int GUIAction::multirom_settings(std::string arg __unused)
 {
 	MultiROM::config cfg = MultiROM::loadConfig();
 
@@ -1935,9 +1955,18 @@ int GUIAction::multirom_settings(std::string arg)
 	DataManager::SetValue("tw_multirom_current", cfg.current_rom);
 	DataManager::SetValue("tw_multirom_auto_boot_rom", cfg.auto_boot_rom);
 	DataManager::SetValue("tw_multirom_auto_boot_type", (cfg.auto_boot_type & MROM_AUTOBOOT_LAST));
+#ifdef MR_NO_KEXEC
+	DataManager::SetValue("tw_multirom_no_kexec", cfg.no_kexec & 0x3F);
+	DataManager::SetValue("tw_multirom_no_kexec_internal", (cfg.no_kexec & 0x40) ? 1 : 0);
+	DataManager::SetValue("tw_multirom_no_kexec_restore", (cfg.no_kexec & 0x80) ? 1 : 0);
+#else
+	DataManager::SetValue("tw_multirom_no_kexec_na", 1);  //no-kexec workaround is disabled in this build
+	DataManager::SetValue("tw_multirom_no_kexec", 0);
+#endif
 	DataManager::SetValue("tw_multirom_colors", cfg.colors);
 	DataManager::SetValue("tw_multirom_brightness", cfg.brightness);
 	DataManager::SetValue("tw_multirom_enable_adb", cfg.enable_adb);
+	DataManager::SetValue("tw_multirom_enable_kmsg_logging", cfg.enable_kmsg_logging);
 	DataManager::SetValue("tw_multirom_hide_internal", cfg.hide_internal);
 	DataManager::SetValue("tw_multirom_int_display_name", cfg.int_display_name);
 	DataManager::SetValue("tw_multirom_rotation", cfg.rotation);
@@ -1950,7 +1979,7 @@ int GUIAction::multirom_settings(std::string arg)
 	return gui_changePage("multirom_settings");
 }
 
-int GUIAction::multirom_settings_save(std::string arg)
+int GUIAction::multirom_settings_save(std::string arg __unused)
 {
 	MultiROM::config cfg;
 	cfg.current_rom = DataManager::GetStrValue("tw_multirom_current");
@@ -1968,9 +1997,18 @@ int GUIAction::multirom_settings_save(std::string arg)
 			break;
 	}
 	cfg.auto_boot_rom = DataManager::GetStrValue("tw_multirom_auto_boot_rom");
+#ifdef MR_NO_KEXEC
+	cfg.no_kexec = DataManager::GetIntValue("tw_multirom_no_kexec");
+	if (cfg.no_kexec != 0)
+	{
+		cfg.no_kexec += (DataManager::GetIntValue("tw_multirom_no_kexec_internal") == 1) ? 0x40 : 0;
+		cfg.no_kexec += (DataManager::GetIntValue("tw_multirom_no_kexec_restore") == 1) ? 0x80 : 0;
+	}
+#endif
 	cfg.colors = DataManager::GetIntValue("tw_multirom_colors");
 	cfg.brightness = DataManager::GetIntValue("tw_multirom_brightness");
 	cfg.enable_adb = DataManager::GetIntValue("tw_multirom_enable_adb");
+	cfg.enable_kmsg_logging = DataManager::GetIntValue("tw_multirom_enable_kmsg_logging");
 	cfg.hide_internal = DataManager::GetIntValue("tw_multirom_hide_internal");
 	cfg.int_display_name = DataManager::GetStrValue("tw_multirom_int_display_name");
 	cfg.rotation = DataManager::GetIntValue("tw_multirom_rotation");
@@ -1983,7 +2021,7 @@ int GUIAction::multirom_settings_save(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_add(std::string arg)
+int GUIAction::multirom_add(std::string arg __unused)
 {
 	DataManager::SetValue("tw_multirom_install_loc_list", MultiROM::listInstallLocations());
 	DataManager::SetValue("tw_multirom_install_loc", INTERNAL_MEM_LOC_TXT);
@@ -1991,7 +2029,7 @@ int GUIAction::multirom_add(std::string arg)
 	return gui_changePage("multirom_add");
 }
 
-int GUIAction::multirom_add_second(std::string arg)
+int GUIAction::multirom_add_second(std::string arg __unused)
 {
 	switch(DataManager::GetIntValue("tw_multirom_type"))
 	{
@@ -2006,7 +2044,7 @@ int GUIAction::multirom_add_second(std::string arg)
 	}
 }
 
-int GUIAction::multirom_add_file_selected(std::string arg)
+int GUIAction::multirom_add_file_selected(std::string arg __unused)
 {
 	std::string loc = DataManager::GetStrValue("tw_multirom_install_loc");
 	bool images = MultiROM::installLocNeedsImages(loc);
@@ -2091,7 +2129,7 @@ int GUIAction::multirom_change_img_size(std::string arg)
 	return gui_changePage("multirom_change_img_size");
 }
 
-int GUIAction::multirom_change_img_size_act(std::string arg)
+int GUIAction::multirom_change_img_size_act(std::string arg __unused)
 {
 	int value = DataManager::GetIntValue("tw_multirom_image_size");
 
@@ -2121,13 +2159,13 @@ int GUIAction::multirom_change_img_size_act(std::string arg)
 	return gui_changePage("multirom_add_image_size");
 }
 
-int GUIAction::multirom_set_list_loc(std::string arg)
+int GUIAction::multirom_set_list_loc(std::string arg __unused)
 {
 	DataManager::SetValue("tw_multirom_install_loc_list", MultiROM::listInstallLocations());
 	return gui_changePage("multirom_set_list_loc");
 }
 
-int GUIAction::multirom_list_loc_selected(std::string arg)
+int GUIAction::multirom_list_loc_selected(std::string arg __unused)
 {
 	std::string loc = DataManager::GetStrValue("tw_multirom_install_loc");
 	if(!MultiROM::setRomsPath(loc))
@@ -2175,7 +2213,7 @@ int GUIAction::multirom_list_roms_for_swap(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_delete(std::string arg)
+int GUIAction::multirom_delete(std::string arg __unused)
 {
 	int op_status = 0;
 	operation_start("Delete ROM");
@@ -2186,7 +2224,7 @@ int GUIAction::multirom_delete(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_flash_zip(std::string arg)
+int GUIAction::multirom_flash_zip(std::string arg __unused)
 {
 	operation_start("Flashing");
 	int op_status = 0;
@@ -2215,7 +2253,7 @@ int GUIAction::multirom_flash_zip(std::string arg)
 	return op_status;
 }
 
-int GUIAction::multirom_flash_zip_sailfish(std::string arg)
+int GUIAction::multirom_flash_zip_sailfish(std::string arg __unused)
 {
 	operation_start("Flashing");
 	int op_status = 0;
@@ -2243,7 +2281,7 @@ int GUIAction::multirom_flash_zip_sailfish(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_inject(std::string arg)
+int GUIAction::multirom_inject(std::string arg __unused)
 {
 	operation_start("Injecting");
 	int op_status = 0;
@@ -2257,7 +2295,7 @@ int GUIAction::multirom_inject(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_inject_curr_boot(std::string arg)
+int GUIAction::multirom_inject_curr_boot(std::string arg __unused)
 {
 	operation_start("Injecting");
 	int op_status = !MultiROM::folderExists();
@@ -2269,7 +2307,7 @@ int GUIAction::multirom_inject_curr_boot(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_add_rom(std::string arg)
+int GUIAction::multirom_add_rom(std::string arg __unused)
 {
 	operation_start("Installing");
 	int op_status = !MultiROM::addROM(DataManager::GetStrValue("tw_filename"),
@@ -2279,7 +2317,7 @@ int GUIAction::multirom_add_rom(std::string arg)
 	return op_status;
 }
 
-int GUIAction::multirom_ubuntu_patch_init(std::string arg)
+int GUIAction::multirom_ubuntu_patch_init(std::string arg __unused)
 {
 	operation_start("Patching");
 	int op_status = !MultiROM::patchInit(DataManager::GetStrValue("tw_multirom_rom_name"));
@@ -2287,7 +2325,7 @@ int GUIAction::multirom_ubuntu_patch_init(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_touch_patch_init(std::string arg)
+int GUIAction::multirom_touch_patch_init(std::string arg __unused)
 {
 	operation_start("Patching");
 	int op_status = 1;
@@ -2311,7 +2349,7 @@ int GUIAction::multirom_touch_patch_init(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_wipe(std::string arg)
+int GUIAction::multirom_wipe(std::string arg __unused)
 {
 	operation_start("Wiping");
 	int op_status = !MultiROM::wipe(DataManager::GetStrValue("tw_multirom_rom_name"),
@@ -2320,7 +2358,7 @@ int GUIAction::multirom_wipe(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_disable_flash_kernel(std::string arg)
+int GUIAction::multirom_disable_flash_kernel(std::string arg __unused)
 {
 	operation_start("working");
 	int op_status = !MultiROM::disableFlashKernelAct(DataManager::GetStrValue("tw_multirom_rom_name"),
@@ -2329,7 +2367,7 @@ int GUIAction::multirom_disable_flash_kernel(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_rm_bootimg(std::string arg)
+int GUIAction::multirom_rm_bootimg(std::string arg __unused)
 {
 	operation_start("working");
 	std::string cmd = "rm \"" + MultiROM::getRomsPath() + "/" + DataManager::GetStrValue("tw_multirom_rom_name") + "/boot.img\"";
@@ -2339,7 +2377,7 @@ int GUIAction::multirom_rm_bootimg(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_backup_rom(std::string arg)
+int GUIAction::multirom_backup_rom(std::string arg __unused)
 {
 	operation_start("Changing mountpoints for backup");
 	int op_status = !MultiROM::initBackup(DataManager::GetStrValue("tw_multirom_rom_name"));
@@ -2356,7 +2394,7 @@ int GUIAction::multirom_backup_rom(std::string arg)
 	}
 }
 
-int GUIAction::multirom_sideload(std::string arg)
+int GUIAction::multirom_sideload(std::string arg __unused)
 {
 	int ret = 0;
 
@@ -2403,7 +2441,7 @@ int GUIAction::multirom_sideload(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_swap_calc_space(std::string arg)
+int GUIAction::multirom_swap_calc_space(std::string arg __unused)
 {
 	static const char *parts[] = { "/cache", "/system", "/data" };
 	TWPartition *p;
@@ -2486,7 +2524,7 @@ int GUIAction::multirom_swap_calc_space(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_execute_swap(std::string arg)
+int GUIAction::multirom_execute_swap(std::string arg __unused)
 {
 	operation_start("SwapROMs");
 
@@ -2559,7 +2597,7 @@ int GUIAction::multirom_execute_swap(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_set_fw(std::string arg)
+int GUIAction::multirom_set_fw(std::string arg __unused)
 {
 	operation_start("CopyFW");
 
@@ -2575,7 +2613,7 @@ int GUIAction::multirom_set_fw(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_remove_fw(std::string arg)
+int GUIAction::multirom_remove_fw(std::string arg __unused)
 {
 	operation_start("RemoveFW");
 
@@ -2588,7 +2626,7 @@ int GUIAction::multirom_remove_fw(std::string arg)
 	return 0;
 }
 
-int GUIAction::multirom_restorecon(std::string arg)
+int GUIAction::multirom_restorecon(std::string arg __unused)
 {
 	operation_start("restorecon");
 	int res = MultiROM::restorecon(DataManager::GetStrValue("tw_multirom_rom_name")) ? 0 : -1;
@@ -2596,7 +2634,7 @@ int GUIAction::multirom_restorecon(std::string arg)
 	return 0;
 }
 
-int GUIAction::system_image_upgrader(std::string arg)
+int GUIAction::system_image_upgrader(std::string arg __unused)
 {
 	operation_start("system-image-upgrader");
 
@@ -2605,7 +2643,7 @@ int GUIAction::system_image_upgrader(std::string arg)
 	if(TWFunc::Path_Exists(UBUNTU_COMMAND_FILE))
 	{
 		gui_print("\n");
-		res = TWFunc::Exec_Cmd_Show_Output("system-image-upgrader "UBUNTU_COMMAND_FILE);
+		res = TWFunc::Exec_Cmd_Show_Output("system-image-upgrader " UBUNTU_COMMAND_FILE);
 		gui_print("\n");
 
 		if(res != 0)
@@ -2615,7 +2653,7 @@ int GUIAction::system_image_upgrader(std::string arg)
 		}
 		DataManager::SetValue("system-image-upgrader-res", res);
 	} else
-		gui_print("Could not find system-image-upgrader command file: "UBUNTU_COMMAND_FILE"\n");
+		gui_print("Could not find system-image-upgrader command file: " UBUNTU_COMMAND_FILE"\n");
 
 	DataManager::SetValue("tw_page_done", 1);
 	operation_end(res);

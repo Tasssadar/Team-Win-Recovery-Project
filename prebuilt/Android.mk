@@ -4,6 +4,7 @@ RELINK := $(LOCAL_PATH)/relink.sh
 
 #dummy file to trigger required modules
 include $(CLEAR_VARS)
+
 LOCAL_MODULE := teamwin
 LOCAL_MODULE_TAGS := eng
 LOCAL_MODULE_CLASS := RECOVERY_EXECUTABLES
@@ -13,13 +14,14 @@ LOCAL_MODULE_PATH := $(TARGET_RECOVERY_ROOT_OUT)/sbin
 RELINK_SOURCE_FILES += $(TARGET_RECOVERY_ROOT_OUT)/sbin/dump_image
 RELINK_SOURCE_FILES += $(TARGET_RECOVERY_ROOT_OUT)/sbin/flash_image
 RELINK_SOURCE_FILES += $(TARGET_RECOVERY_ROOT_OUT)/sbin/erase_image
+RELINK_SOURCE_FILES += $(TARGET_RECOVERY_ROOT_OUT)/sbin/bu
 ifneq ($(TW_USE_TOOLBOX), true)
 	RELINK_SOURCE_FILES += $(TARGET_OUT_OPTIONAL_EXECUTABLES)/busybox
 else
 	RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/sh
 	RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libcrypto.so
 	ifneq (,$(filter $(PLATFORM_SDK_VERSION), 23))
-	    RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/toybox
+	    RELINK_SOURCE_FILES += $(TARGET_RECOVERY_ROOT_OUT)/sbin/toybox
 	    ifneq ($(wildcard external/zip/Android.mk),)
                 RELINK_SOURCE_FILES += $(TARGET_OUT_OPTIONAL_EXECUTABLES)/zip
 	    endif
@@ -77,6 +79,7 @@ RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libminadbd.so
 RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libminzip.so
 RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libmtdutils.so
 RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libtar.so
+RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libtwadbbu.so
 RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libutil-linux.so
 RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libblkid.so
 RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libmmcutils.so
@@ -199,7 +202,7 @@ ifneq ($(wildcard external/pcre/Android.mk),)
     RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libpcre.so
 endif
 ifeq ($(TW_INCLUDE_NTFS_3G),true)
-ifeq ($(shell test $(CM_PLATFORM_SDK_VERSION) -ge 4; echo $$?),0)
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -gt 22; echo $$?),0)
     RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/mount.ntfs
     RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/fsck.ntfs
     RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/mkfs.ntfs
@@ -216,16 +219,15 @@ ifeq ($(BOARD_HAS_NO_REAL_SDCARD),)
         RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/sgdisk
     endif
 endif
-ifeq ($(TARGET_USES_LOGD), true)
-    RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/logd
-    RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libsysutils.so
-    RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libnl.so
-endif
 ifeq ($(TWRP_INCLUDE_LOGCAT), true)
     RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/logcat
+    ifeq ($(TARGET_USES_LOGD), true)
+        RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/logd
+        RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libsysutils.so
+        RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libnl.so
+    endif
 endif
 TWRP_AUTOGEN := $(intermediates)/teamwin
-
 GEN := $(intermediates)/teamwin
 $(GEN): $(RELINK)
 $(GEN): $(RELINK_SOURCE_FILES) $(call intermediates-dir-for,EXECUTABLES,recovery)/recovery
