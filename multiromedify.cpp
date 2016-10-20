@@ -105,6 +105,16 @@ int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::lis
                 }
             }
         }
+        
+                if(m_name == "abort")
+        {
+            for(std::list<EdifyElement*>::iterator itr = m_args.begin(); itr != m_args.end(); ++itr)
+            {
+                if((*itr)->getType() != EDF_VALUE)
+                    continue;
+
+            }
+        }
 
         res |= OFF_CHANGED;
         m_name = "ui_print";
