@@ -63,8 +63,6 @@ extern "C" {
 #include "../multirom/mrominstaller.h"
 #endif //TARGET_RECOVERY_IS_MULTIROM
 
-void curtainClose(void);
-
 GUIAction::mapFunc GUIAction::mf;
 std::set<string> GUIAction::setActionsRunningInCallerThread;
 static string zip_queue[10];
@@ -329,7 +327,7 @@ GUIAction::GUIAction(xml_node<>* node)
 	}
 }
 
-int GUIAction::NotifyTouch(TOUCH_STATE state __unused, int x __unused, int y __unused)
+int GUIAction::NotifyTouch(TOUCH_STATE state, int x __unused, int y __unused)
 {
 	if (state == TOUCH_RELEASE)
 		doActions();
@@ -566,8 +564,6 @@ void GUIAction::operation_end(const int operation_status)
 
 int GUIAction::reboot(std::string arg)
 {
-	//curtainClose(); this sometimes causes a crash
-
 	sync();
 	DataManager::SetValue("tw_gui_done", 1);
 	DataManager::SetValue("tw_reboot_arg", arg);
@@ -842,6 +838,8 @@ int GUIAction::appenddatetobackupname(std::string arg __unused)
 	if (Backup_Name.size() > MAX_BACKUP_NAME_LEN)
 		Backup_Name.resize(MAX_BACKUP_NAME_LEN);
 	DataManager::SetValue(TW_BACKUP_NAME, Backup_Name);
+	PageManager::NotifyKey(KEY_END, true);
+	PageManager::NotifyKey(KEY_END, false);
 	operation_end(0);
 	return 0;
 }
@@ -1083,7 +1081,14 @@ int GUIAction::flash(std::string arg)
 
 	reinject_after_flash();
 	PartitionManager.Update_System_Details();
+	if (DataManager::GetIntValue("tw_install_reboot") > 0 && ret_val == 0) {
+		gui_msg("install_reboot=Rebooting in 5 seconds");
+		usleep(5000000);
+		TWFunc::tw_reboot(rb_system);
+		usleep(5000000); // another sleep while we wait for the reboot to occur
+	}
 	operation_end(ret_val);
+	// This needs to be after the operation_end call so we change pages before we change variables that we display on the screen
 	DataManager::SetValue(TW_ZIP_QUEUE_COUNT, zip_queue_index);
 	return 0;
 }

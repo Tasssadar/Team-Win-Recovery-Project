@@ -2126,15 +2126,15 @@ bool MultiROM::installFromBackup(std::string name, std::string path, int type)
 		path.replace(0, 5, REALDATA);
 
 	unsigned long long total_restore_size = 0, already_restored_size = 0;
-	const int partCnt = has_data ? 2 : 1;
 	bool res = false;
+	ProgressTracking progress(total_restore_size);
 	TWPartition *sys_part = PartitionManager.Find_Partition_By_Path("/system");
 	TWPartition *data_part = PartitionManager.Find_Partition_By_Path("/data");
 	if(sys_part && data_part)
 	{
 		PartitionManager.Set_Restore_Files(path);
-		res = PartitionManager.Restore_Partition(sys_part, path, partCnt, &total_restore_size, &already_restored_size) &&
-				(!has_data || PartitionManager.Restore_Partition(data_part, path, partCnt, &total_restore_size, &already_restored_size));
+		res = PartitionManager.Restore_Partition(sys_part, path, &progress) &&
+				(!has_data || PartitionManager.Restore_Partition(data_part, path, &progress));
 	}
 	else
 	{

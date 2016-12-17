@@ -338,13 +338,29 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row2_3a_y%" />
 				<font resource="body2" color="%text%" />
+				<text>Reboot after installation is complete</text>
+				<data variable="tw_install_reboot" />
+				<image checked="checkbox_true" unchecked="checkbox_false" />
+			</object>
+
+			<object type="checkbox">
+				<placement x="%col1_x%" y="%row3_2_y%" />
+				<font resource="body2" color="%text%" />
 				<text>Use rm -rf instead of formatting</text>
 				<data variable="tw_rm_rf" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row3_2_y%" />
+				<placement x="%col1_x%" y="%row3_3a_y%" />
+				<font resource="body2" color="%text%" />
+				<text>Disable free space check before backup</text>
+				<data variable="tw_disable_free_space" />
+				<image checked="checkbox_true" unchecked="checkbox_false" />
+			</object>
+
+			<object type="checkbox">
+				<placement x="%col1_x%" y="%row4_2_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Skip MD5 generation on backups</text>
 				<data variable="tw_skip_md5_generate" />
@@ -352,7 +368,7 @@
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row3_3a_y%" />
+				<placement x="%col1_x%" y="%row4_3a_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Enable MD5 checking of backup files</text>
 				<data variable="tw_skip_md5_check" />
@@ -360,7 +376,7 @@
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row4_2_y%" />
+				<placement x="%col1_x%" y="%row5_2_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Simulate most actions for theme testing</text>
 				<data variable="tw_simulate_actions" />
@@ -369,7 +385,7 @@
 
 			<object type="checkbox">
 				<condition var1="tw_simulate_actions" var2="1" />
-				<placement x="%col1_x%" y="%row4_3a_y%" />
+				<placement x="%col1_x%" y="%row5_3a_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Simulate failure for actions</text>
 				<data variable="tw_simulate_fail" />
@@ -2156,15 +2172,7 @@
 				<image resource="btn_raised_rebootrecovery" />
 				<actions>
 					<action function="set">tw_back=main</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -2590,36 +2598,36 @@
 
 			<object type="text" color="%text_dark%">
 				<font resource="caption" />
-				<placement x="%col1_x%" y="%row2_2_y%"  />
+				<placement x="%col1_x%" y="%row2_1a_y%"  />
 				<text>File</text>
 			</object>
 
 			<object type="text" color="%text%">
 				<font resource="body2" />
-				<placement x="%col1_x%" y="%row2_3_y%" />
+				<placement x="%col1_x%" y="%row2_2a_y%" />
 				<text>%tw_file%</text>
 			</object>
 
 			<object type="text" color="%text_dark%">
 				<font resource="caption" />
-				<placement x="%col1_x%" y="%row3_2_y%"  />
+				<placement x="%col1_x%" y="%row3_1_y%"  />
 				<text>Folder</text>
 			</object>
 
 			<object type="text" color="%text%">
 				<font resource="body2" />
-				<placement x="%col1_x%" y="%row3_3_y%" />
+				<placement x="%col1_x%" y="%row3_2_y%" />
 				<text>%tw_zip_location%</text>
 			</object>
 
 			<object type="text" color="%text_dark%">
 				<font resource="caption" />
-				<placement x="%col1_x%" y="%row4_2_y%" />
+				<placement x="%col1_x%" y="%row4_1_y%" />
 				<text>Options</text>
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row4_3_y%" />
+				<placement x="%col1_x%" y="%row4_2_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Zip file Signature Verification</text>
 				<data variable="tw_signed_zip_verify" />
@@ -2627,7 +2635,7 @@
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row5_1a_y%" />
+				<placement x="%col1_x%" y="%row4_3a_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Force MD5 check on all Zip files</text>
 				<data variable="tw_force_md5_check" />
@@ -2635,7 +2643,15 @@
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row5_3_y%" />
+				<placement x="%col1_x%" y="%row5_2_y%" />
+				<font resource="body2" color="%text%" />
+				<text>Reboot after installation is complete</text>
+				<data variable="tw_install_reboot" />
+				<image checked="checkbox_true" unchecked="checkbox_false" />
+			</object>
+
+			<object type="checkbox">
+				<placement x="%col1_x%" y="%row5_3a_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Inject MultiROM after installation</text>
 				<data variable="tw_auto_inject_mrom" />
@@ -2644,7 +2660,7 @@
 
 			<object type="checkbox">
 				<condition var1="tw_has_injecttwrp" var2="1" />
-				<placement x="%col1_x%" y="%row6_1a_y%" />
+				<placement x="%col1_x%" y="%row6_2_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Inject TWRP after install</text>
 				<data variable="tw_inject_after_zip" />
@@ -2654,7 +2670,7 @@
 			<object type="button">
 				<condition var1="tw_zip_queue_count" op="&gt;" var2="1" />
 				<highlight color="%highlight_color%" />
-				<placement x="%btn_raised_left_x%" y="%row6_3_y%" />
+				<placement x="%btn_raised_left_x%" y="%row7_1_y%" />
 				<font resource="menu" color="%text_button%" />
 				<image resource="btn_raised_viewqueue" />
 				<actions>
@@ -2664,7 +2680,7 @@
 
 			<object type="button">
 				<highlight color="%highlight_color%" />
-				<placement x="%btn_raised_right_x%" y="%row6_3_y%" placement="1" />
+				<placement x="%btn_raised_right_x%" y="%row7_1_y%" placement="1" />
 				<font resource="menu" color="%text_button%" />
 				<image resource="btn_raised_clearqueue" />
 				<actions>
@@ -3843,15 +3859,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -3939,15 +3947,7 @@
 				<image resource="btn_raised_rebootrecovery" />
 				<actions>
 					<action function="set">tw_back=main</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -3958,15 +3958,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4006,6 +3998,38 @@
 				<action function="set">tw_show_exclamation=0</action>
 				<action function="set">tw_show_reboot=0</action>
 				<action function="page">%tw_clear_destination%</action>
+			</object>
+		</page>
+
+		<page name="reboot_recovery_routine">
+			<object type="action">
+				<actions>
+					<action function="set">tw_action=reboot</action>
+					<action function="set">tw_action_param=recovery</action>
+					<action function="set">tw_has_action2=0</action>
+					<action function="set">tw_text1=No OS Installed!</action>
+					<action function="set">tw_text2=Are you sure you wish to restart?</action>
+					<action function="set">tw_action_text1=Restarting...</action>
+					<action function="set">tw_complete_text1=Restarting...</action>
+					<action function="set">tw_slider_text=Swipe to Restart</action>
+					<action function="page">rebootcheck</action>
+				</actions>
+			</object>
+		</page>
+
+		<page name="reboot_system_routine">
+			<object type="action">
+				<actions>
+					<action function="set">tw_action=reboot</action>
+					<action function="set">tw_action_param=system</action>
+					<action function="set">tw_has_action2=0</action>
+					<action function="set">tw_text1=No OS Installed!</action>
+					<action function="set">tw_text2=Are you sure you wish to restart?</action>
+					<action function="set">tw_action_text1=Restarting...</action>
+					<action function="set">tw_complete_text1=Restarting...</action>
+					<action function="set">tw_slider_text=Swipe to Restart</action>
+					<action function="page">rebootcheck</action>
+				</actions>
 			</object>
 		</page>
 
@@ -4323,15 +4347,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4381,15 +4397,7 @@
 				<image resource="mb_system" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4404,15 +4412,7 @@
 				<image resource="mb_system_color" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4433,15 +4433,7 @@
 				<image resource="mb_recovery" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -4456,15 +4448,7 @@
 				<image resource="mb_recovery_color" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -6231,15 +6215,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -6407,7 +6383,7 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row7_2a_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Disable Free Space Check</text>
+				<text>Disable free space check before backup</text>
 				<data variable="tw_disable_free_space" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
@@ -6759,15 +6735,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -7669,15 +7637,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -9332,15 +9292,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -11056,17 +11008,9 @@
 					rm -r "/cache/twrp";
 					</action>
 					<action function="set">hl_color=%tw_hl_color%</action>
-					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
 					<action function="overlay"></action>
-					<action function="page">rebootcheck</action>
+					<action function="set">tw_back=reboot</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -11407,15 +11351,7 @@
 					chown -R media_rw:media_rw /sdcard/TWRP/theme
 					</action>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -11739,15 +11675,7 @@
 					</action>
 					<action function="overlay"></action>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 

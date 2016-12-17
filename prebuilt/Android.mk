@@ -19,7 +19,7 @@ else
 	RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/sh
 	RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libcrypto.so
 	ifneq (,$(filter $(PLATFORM_SDK_VERSION), 23))
-	    RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/toybox
+	    RELINK_SOURCE_FILES += $(TARGET_RECOVERY_ROOT_OUT)/sbin/toybox
 	    ifneq ($(wildcard external/zip/Android.mk),)
                 RELINK_SOURCE_FILES += $(TARGET_OUT_OPTIONAL_EXECUTABLES)/zip
 	    endif
@@ -216,13 +216,13 @@ ifeq ($(BOARD_HAS_NO_REAL_SDCARD),)
         RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/sgdisk
     endif
 endif
-ifeq ($(TARGET_USES_LOGD), true)
-    RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/logd
-    RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libsysutils.so
-    RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libnl.so
-endif
 ifeq ($(TWRP_INCLUDE_LOGCAT), true)
     RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/logcat
+    ifeq ($(TARGET_USES_LOGD), true)
+        RELINK_SOURCE_FILES += $(TARGET_OUT_EXECUTABLES)/logd
+        RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libsysutils.so
+        RELINK_SOURCE_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/libnl.so
+    endif
 endif
 TWRP_AUTOGEN := $(intermediates)/teamwin
 
